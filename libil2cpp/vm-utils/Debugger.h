@@ -59,6 +59,7 @@ namespace utils
     {
     public:
         static void RegisterMetadata(const Il2CppDebuggerMetadataRegistration *data);
+        static void RegisterAssemblyMetadata(const Il2CppAssembly* newAssembly);
         static void SetAgentOptions(const char* options);
         static void RegisterTransport(const Il2CppDebuggerTransport* transport);
         static void Init();
@@ -179,6 +180,10 @@ namespace utils
         static void InitializeMethodToSequencePointMap();
         static void InitializeTypeSourceFileMap();
         static void InitializeMethodToCatchPointMap();
+
+        static void AddMethodToSequencePointMap(const Il2CppAssembly* newAssembly);
+        static void AddTypeSourceFileMap(const Il2CppAssembly* newAssembly);
+        static void AddMethodToCatchPointMap(const Il2CppAssembly* newAssembly);
     };
 }
 }

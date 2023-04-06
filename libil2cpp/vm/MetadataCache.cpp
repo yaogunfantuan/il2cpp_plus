@@ -1189,7 +1189,10 @@ Il2CppClass* il2cpp::vm::MetadataCache::FromTypeDefinition(TypeDefinitionIndex i
     typeInfo->interface_offsets_count = typeDefinition->interface_offsets_count;
     typeInfo->token = typeDefinition->token;
     typeInfo->interopData = il2cpp::vm::MetadataCache::GetInteropDataForType(&typeInfo->byval_arg);
-
+    if (type_info->is_generic){
+        typeInfo->static_fields_size = 0;
+        thread_static_fields_size = 0;
+    }
     if (typeDefinition->parentIndex != kTypeIndexInvalid)
         typeInfo->parent = il2cpp::vm::Class::FromIl2CppType(il2cpp::vm::MetadataCache::GetIl2CppTypeFromIndex(typeDefinition->parentIndex));
 
@@ -1258,11 +1261,18 @@ const Il2CppAssembly* il2cpp::vm::MetadataCache::LoadAssemblyFromBytes(const cha
     {
         if (ass == newAssembly)
         {
+#if IL2CPP_MONO_DEBUGGER
+            //if (!ass->token) {
+                il2cpp::utils::Debugger::RegisterAssemblyMetadata(newAssembly);
+            //}
+#endif
             return ass;
         }
     }
     RegisterInterpreterAssembly(newAssembly);
-
+#if IL2CPP_MONO_DEBUGGER
+    il2cpp::utils::Debugger::RegisterAssemblyMetadata(newAssembly);
+#endif
     return newAssembly;
 }
 
@@ -1771,6 +1781,10 @@ const GenericParameterIndex il2cpp::vm::MetadataCache::GetIndexForGenericParamet
 const MethodIndex il2cpp::vm::MetadataCache::GetIndexForMethodDefinition(const MethodInfo* method)
 {
     IL2CPP_ASSERT(!method->is_inflated);
+    if (hybridclr::metadata::IsInterpreterMethod(method))
+    {
+                return static_cast<MethodIndex>(hybridclr::metadata::MetadataModule::GetMethodEncodeIndex(method));
+    }
     const Il2CppMethodDefinition* methodDefinitions = (const Il2CppMethodDefinition*)((const char*)s_GlobalMetadata + s_GlobalMetadataHeader->methodsOffset);
 
     IL2CPP_ASSERT(method->methodDefinition >= methodDefinitions && method->methodDefinition < methodDefinitions + s_GlobalMetadataHeader->methodsCount);

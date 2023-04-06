@@ -110,6 +110,14 @@ namespace utils
         g_metadata = data;
     }
 
+    void Debugger::RegisterAssemblyMetadata(const Il2CppAssembly* newAssembly)
+    {
+        AddMethodToSequencePointMap(newAssembly);
+        AddTypeSourceFileMap(newAssembly);
+        AddMethodToCatchPointMap(newAssembly);
+    }
+
+
 #if defined(RUNTIME_IL2CPP)
     void breakpoint_callback(Il2CppSequencePoint* sequencePoint)
     {
@@ -196,6 +204,34 @@ namespace utils
 
                 files.push_back(file);
             }
+        }
+
+        if (files.size() > 0)
+            s_typeSourceFiles->add(klass, files);
+    }
+
+    void Debugger::AddTypeSourceFileMap(const Il2CppAssembly* newAssembly)
+    {
+        int lastTypeIndex = -1;
+        Il2CppClass *klass = NULL;
+        FileNameList files;
+
+        const Il2CppDebuggerMetadataRegistration* debuggerMetadata = vm::Assembly::GetImage(newAssembly)->codeGenModule->debuggerMetadata;
+        for (int i = 0; i < debuggerMetadata->numTypeSourceFileEntries; ++i)
+        {
+            Il2CppTypeSourceFilePair& pair = debuggerMetadata->typeSourceFiles[i];
+            const char *file = debuggerMetadata->sequencePointSourceFiles[pair.sourceFileIndex].file;
+            if (pair.klassIndex != lastTypeIndex)
+            {
+                if (klass)
+                    s_typeSourceFiles->add(klass, files);
+
+                klass = il2cpp::vm::MetadataCache::GetTypeInfoFromTypeDefinitionIndex(pair.klassIndex);
+                lastTypeIndex = pair.klassIndex;
+                files.clear();
+            }
+
+            files.push_back(file);
         }
 
         if (files.size() > 0)
@@ -580,6 +616,45 @@ namespace utils
         }
     }
 
+    void Debugger::AddMethodToSequencePointMap(const Il2CppAssembly* assembly)
+    {
+        size_t count = 0;
+        const Il2CppDebuggerMetadataRegistration* debuggerMetadata = vm::Assembly::GetImage(assembly)->codeGenModule->debuggerMetadata;
+        for (int i = 0; i < debuggerMetadata->numSequencePoints; ++i)
+        {
+            Il2CppSequencePoint& seqPoint = debuggerMetadata->sequencePoints[i];
+            const MethodInfo *method = GetSequencePointMethod(&seqPoint);
+
+            if (method != NULL)
+            {
+                IL2CPP_ASSERT(!method->is_inflated && "Only open generic methods should have sequence points");
+
+                SequencePointList* list;
+                MethodToSequencePointsMap::iterator existingList = s_methodToSequencePoints.find(method);
+                if (existingList == s_methodToSequencePoints.end())
+                {
+                    list = new SequencePointList();
+                    s_methodToSequencePoints.add(method, list);
+                }
+                else
+                {
+                    list = existingList->second;
+                }
+                list->push_back(&seqPoint);
+                count++;
+            }
+        }
+
+        s_sequencePoints.reserve(s_sequencePoints.size() + count);
+        s_sequencePoints.clear();
+        for (MethodToSequencePointsMap::iterator methods = s_methodToSequencePoints.begin(); methods != s_methodToSequencePoints.end(); ++methods)
+        {
+            SequencePointList *seqPoints = methods->second;
+            std::sort(seqPoints->begin(), seqPoints->end(), SequencePointOffsetLess);
+            s_sequencePoints.insert(s_sequencePoints.end(), seqPoints->begin(), seqPoints->end());
+        }
+    }
+
     void Debugger::InitializeMethodToCatchPointMap()
     {
         vm::AssemblyVector* assemblies = vm::Assembly::GetAllAssemblies();
@@ -606,6 +681,38 @@ namespace utils
                     }
                     list->push_back(&catchPoint);
                 }
+            }
+        }
+
+        for (MethodToCatchPointsMap::iterator methods = s_methodToCatchPoints.begin(); methods != s_methodToCatchPoints.end(); ++methods)
+        {
+            CatchPointList *catchPoints = methods->second;
+            std::sort(catchPoints->begin(), catchPoints->end(), CatchPointOffsetLess);
+        }
+    }
+
+    void Debugger::AddMethodToCatchPointMap(const Il2CppAssembly* assembly)
+    {
+        const Il2CppDebuggerMetadataRegistration* debuggerMetadata = vm::Assembly::GetImage(assembly)->codeGenModule->debuggerMetadata;
+        for (int i = 0; i < debuggerMetadata->numCatchPoints; ++i)
+        {
+            Il2CppCatchPoint& catchPoint = debuggerMetadata->catchPoints[i];
+            const MethodInfo *method = GetCatchPointMethod(&catchPoint);
+
+            if (method != NULL)
+            {
+                CatchPointList* list;
+                MethodToCatchPointsMap::iterator existingList = s_methodToCatchPoints.find(method);
+                if (existingList == s_methodToCatchPoints.end())
+                {
+                    list = new CatchPointList();
+                    s_methodToCatchPoints.add(method, list);
+                }
+                else
+                {
+                    list = existingList->second;
+                }
+                list->push_back(&catchPoint);
             }
         }
 
