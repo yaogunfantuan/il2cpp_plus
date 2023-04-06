@@ -1248,11 +1248,11 @@ void il2cpp::vm::MetadataCache::RegisterInterpreterAssembly(Il2CppAssembly* asse
     s_cliAssemblies.push_back(assembly);
 }
 
-const Il2CppAssembly* il2cpp::vm::MetadataCache::LoadAssemblyFromBytes(const char* assemblyBytes, size_t length)
+const Il2CppAssembly* il2cpp::vm::MetadataCache::LoadAssemblyFromBytes(const char* assemblyBytes, size_t length,const char* assemblySymbolBytes, size_t symbolLength)
 {
     il2cpp::os::FastAutoLock lock(&il2cpp::vm::g_MetadataLock);
 
-    Il2CppAssembly* newAssembly = hybridclr::metadata::Assembly::LoadFromBytes(assemblyBytes, length, true);
+    Il2CppAssembly* newAssembly = hybridclr::metadata::Assembly::LoadFromBytes(assemblyBytes, length, assemblySymbolBytes, symbolLength, true);
     // avoid register placeholder assembly twicely.
     for (Il2CppAssembly* ass : s_cliAssemblies)
     {
